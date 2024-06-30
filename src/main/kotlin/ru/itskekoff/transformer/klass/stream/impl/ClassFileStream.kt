@@ -1,12 +1,12 @@
 package ru.itskekoff.transformer.klass.stream.impl
 
-import ru.itskekoff.transformer.klass.stream.ClassFileReader
+import ru.itskekoff.transformer.klass.stream.IClassFileStream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.IOException
 
-class ClassFileStream(private val buf: ByteArray) : ClassFileReader {
+class ClassFileStream(private val buf: ByteArray) : IClassFileStream {
     private val reader = DataInputStream(ByteArrayInputStream(buf))
 
     override fun readByte(): Int = reader.read()

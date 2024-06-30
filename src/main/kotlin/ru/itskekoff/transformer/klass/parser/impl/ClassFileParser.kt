@@ -1,4 +1,4 @@
-package ru.itskekoff.transformer.klass
+package ru.itskekoff.transformer.klass.parser.impl
 
 import ru.itskekoff.transformer.cryptography.XorEncryption
 import ru.itskekoff.transformer.klass.ClassFileConstants.JVM_CONSTANT_CLASS
@@ -18,16 +18,18 @@ import ru.itskekoff.transformer.klass.ClassFileConstants.JVM_CONSTANT_FLOAT
 import ru.itskekoff.transformer.klass.ClassFileConstants.JVM_CONSTANT_LONG
 import ru.itskekoff.transformer.klass.ClassFileConstants.JVM_CONSTANT_DOUBLE
 import ru.itskekoff.transformer.klass.ClassFileConstants.JVM_CONSTANT_UTF8
-import ru.itskekoff.transformer.klass.stream.ClassFileReader
+import ru.itskekoff.transformer.klass.parser.IClassFileParser
+import ru.itskekoff.transformer.klass.stream.IClassFileStream
+import ru.itskekoff.transformer.klass.writer.IClassFileWriter
 import ru.itskekoff.transformer.klass.writer.impl.ClassFileWriter
 import java.io.IOException
 
-class ClassFileParser(private val reader: ClassFileReader, private val writer: ClassFileWriter) {
+class ClassFileParser(private val reader: IClassFileStream, private val writer: IClassFileWriter) : IClassFileParser {
     private val encryption = XorEncryption()
     private val encryptionKey = "я ебал жену обамы мне сосала дочка трампа у"
     private var codeAttributeNameIndex: Short = -1
 
-    private fun parseConstantPoolEntries(constantPoolCount: Int) {
+    override fun parseConstantPoolEntries(constantPoolCount: Int) {
         try {
             var index = 1
             while (index < constantPoolCount) {
@@ -97,7 +99,7 @@ class ClassFileParser(private val reader: ClassFileReader, private val writer: C
     }
 
     @Throws(IOException::class)
-    private fun parseInterfaces(interfacesLength: Int) {
+    override fun parseInterfaces(interfacesLength: Int) {
         if (interfacesLength > 0) {
             for (index in 0 until interfacesLength) {
                 val interfaceIndex = reader.readShort()
@@ -107,7 +109,7 @@ class ClassFileParser(private val reader: ClassFileReader, private val writer: C
     }
 
     @Throws(IOException::class)
-    private fun parseMembers(count: Int, encryptBytecode: Boolean) {
+    override fun parseMembers(count: Int) {
         if (count > 0) {
             for (i in 0 until count) {
                 val accessFlags = reader.readShort()
@@ -119,52 +121,46 @@ class ClassFileParser(private val reader: ClassFileReader, private val writer: C
                 val attributesCount = reader.readShort()
                 writer.writeShort(attributesCount)
                 for (attr in 0 until attributesCount) {
-                    parseAttribute(encryptBytecode)
+                    parseAttribute()
                 }
             }
         }
     }
 
     @Throws(IOException::class)
-    private fun parseFields(fieldsCount: Int, encryptBytecode: Boolean) {
-        parseMembers(fieldsCount, encryptBytecode)
+    override fun parseFields(fieldsCount: Int) {
+        parseMembers(fieldsCount)
     }
 
     @Throws(IOException::class)
-    private fun parseMethods(methodCounts: Int, encryptBytecode: Boolean) {
-        parseMembers(methodCounts, encryptBytecode)
+    override fun parseMethods(methodCounts: Int) {
+        parseMembers(methodCounts)
     }
 
     @Throws(IOException::class)
-    private fun parseAttributes(attributesCount: Int, encryptBytecode: Boolean) {
+    override fun parseAttributes(attributesCount: Int) {
         if (attributesCount > 0) {
             for (i in 0 until attributesCount) {
-                parseAttribute(encryptBytecode)
+                parseAttribute()
             }
         }
     }
 
     @Throws(IOException::class)
-    private fun parseAttribute(encryptBytecode: Boolean) {
+    private fun parseAttribute() {
         val attributeNameIndex = reader.readShort()
         writer.writeShort(attributeNameIndex)
         val attributeLength = reader.readInt()
         writer.writeInt(attributeLength)
         val attributeInfo = ByteArray(attributeLength)
         reader.readFully(attributeInfo)
-
-        if (encryptBytecode && attributeNameIndex.toShort() == codeAttributeNameIndex) {
-            val encryptedAttributeInfo = encryption.encrypt(attributeInfo, encryptionKey)
-            writer.writeBytes(encryptedAttributeInfo)
-        } else {
-            writer.writeBytes(attributeInfo)
-        }
+        writer.writeBytes(attributeInfo)
     }
 
 
     @Throws(IOException::class)
-    fun parseStream(encryptBytecode: Boolean) {
-        reader.readInt() // magic bytes
+    override fun parseStream() {
+        reader.readInt()
 
         val magicBytes = listOf(0xCA.toByte(), 0xFE.toByte(), 0xBA.toByte(), 0xBE.toByte())
 
@@ -193,17 +189,17 @@ class ClassFileParser(private val reader: ClassFileReader, private val writer: C
         val fieldsCount = reader.readShort()
         writer.writeShort(fieldsCount)
 
-        parseFields(fieldsCount, encryptBytecode)
+        parseFields(fieldsCount)
 
         val methodsCounts = reader.readShort()
         writer.writeShort(methodsCounts)
 
-        parseMethods(methodsCounts, encryptBytecode)
+        parseMethods(methodsCounts)
 
         val attributesCount = reader.readShort()
         writer.writeShort(attributesCount)
 
-        parseAttributes(attributesCount, encryptBytecode)
+        parseAttributes(attributesCount)
 
         reader.pushStream(writer.byteArrayOutputStream)
     }

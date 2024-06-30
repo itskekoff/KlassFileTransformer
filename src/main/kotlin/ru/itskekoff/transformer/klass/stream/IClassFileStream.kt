@@ -4,7 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 
 
-interface ClassFileReader {
+interface IClassFileStream {
     fun readByte(): Int
     fun readShort(): Int
     fun readInt(): Int
